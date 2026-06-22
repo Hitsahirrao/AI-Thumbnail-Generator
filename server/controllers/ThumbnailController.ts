@@ -1,65 +1,29 @@
 import { Request, Response } from 'express';
 import Thumbnail from '../models/Thumbnail.js';
-import { GenerateContentConfig, HarmBlockThreshold, HarmCategory } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-import { v2 as cloudinary } from 'cloudinary';
-
-cloudinary.config({ secure: true });
-
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error('GEMINI_API_KEY is required');
-}
-
-if (!process.env.CLOUDINARY_URL) {
-  throw new Error('CLOUDINARY_URL is required');
-}
-
-const uploadImageBuffer = (buffer: Buffer) =>
-  new Promise<string>((resolve, reject) => {
-    const upload = cloudinary.uploader.upload_stream(
-      { resource_type: 'image', folder: 'ai-thumbnails' },
-      (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        if (!result?.secure_url) {
-          reject(new Error('Cloudinary upload did not return a secure URL'));
-          return;
-        }
-
-        resolve(result.secure_url);
-      }
-    );
-
-    upload.end(buffer);
-  });
-
 
 const stylePropmts = {
-    'Bold & Graphic': 'eye-catching thumbnail, bold typography, vibrant colors, expressive facial reaction, dramatic lighting, high contrast, click-worthy composition, professional style',
-    'Tech/Futuristic': 'futuristic thumbnail, sleek modern design, digital UI elements, glowing accents, holographic effects, cyber-tech aesthetic, sharp lighting, high-tech atmosphere',
-    'Minimalist': 'minimalist thumbnail, clean layout, simple shapes, limited color palette, plenty of negative space, modern flat design, clear focal point',
-    'Photorealistic': 'photorealistic thumbnail, ultra-realistic lighting, natural skin tones, candid moment, DSLR-style photography, lifestyle realism, shallow depth of field',
-    'Illustrated': 'illustrated thumbnail, custom digital illustration, stylized characters, bold outlines, vibrant colors, creative cartoon or vector art style',
+  'Bold & Graphic': 'eye-catching thumbnail, bold typography, vibrant colors, expressive facial reaction, dramatic lighting, high contrast, click-worthy composition, professional style',
+  'Tech/Futuristic': 'futuristic thumbnail, sleek modern design, digital UI elements, glowing accents, holographic effects, cyber-tech aesthetic, sharp lighting, high-tech atmosphere',
+  'Minimalist': 'minimalist thumbnail, clean layout, simple shapes, limited color palette, plenty of negative space, modern flat design, clear focal point',
+  'Photorealistic': 'photorealistic thumbnail, ultra-realistic lighting, natural skin tones, candid moment, DSLR-style photography, lifestyle realism, shallow depth of field',
+  'Illustrated': 'illustrated thumbnail, custom digital illustration, stylized characters, bold outlines, vibrant colors, creative cartoon or vector art style',
 };
 
 const colorSchemeDescriptions = {
-    vibrant: 'vibrant and energetic colors, high saturation, bold contrasts, eye-catching palette',
-    sunset: 'warm sunset tones, orange pink and purple hues, soft gradients, cinematic glow',
-    forest: 'natural green tones, earthy colors, calm and organic palette, fresh atmosphere',
-    neon: 'neon glow effects, electric blues and pinks, cyberpunk lighting, high contrast glow',
-    purple: 'purple-dominant color palette, magenta and violet tones, modern and stylish mood',
-    monochrome: 'black and white color scheme, high contrast, dramatic lighting, timeless aesthetic',
-    ocean: 'cool blue and teal tones, aquatic color palette, fresh and clean atmosphere',
-    pastel: 'soft pastel colors, low saturation, gentle tones, calm and friendly aesthetic',
+  vibrant: 'vibrant and energetic colors, high saturation, bold contrasts, eye-catching palette',
+  sunset: 'warm sunset tones, orange pink and purple hues, soft gradients, cinematic glow',
+  forest: 'natural green tones, earthy colors, calm and organic palette, fresh atmosphere',
+  neon: 'neon glow effects, electric blues and pinks, cyberpunk lighting, high contrast glow',
+  purple: 'purple-dominant color palette, magenta and violet tones, modern and stylish mood',
+  monochrome: 'black and white color scheme, high contrast, dramatic lighting, timeless aesthetic',
+  ocean: 'cool blue and teal tones, aquatic color palette, fresh and clean atmosphere',
+  pastel: 'soft pastel colors, low saturation, gentle tones, calm and friendly aesthetic',
 };
 
 export const generateThumbnail = async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId;
+
     if (!userId) {
       return res.status(401).json({ message: 'Not logged in' });
     }
@@ -88,63 +52,36 @@ export const generateThumbnail = async (req: Request, res: Response) => {
       isGenerating: true
     });
 
-    const model = 'gemini-2.5-flash-image-preview';
-
-    const generationConfig: GenerateContentConfig = {
-        maxOutputTokens: 32768,
-        temperature: 1,
-        responseModalities: ['IMAGE'],
-        imageConfig: {
-            aspectRatio: aspect_ratio || '16:9',
-            imageSize: '1K'
-        },
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF },
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.OFF },
-        ]
-    };
-
-    let prompt = `Create a ${stylePropmts[style as keyof typeof stylePropmts]} for: "${title}"`;
+    let prompt = `Create a ${stylePropmts[style as keyof typeof stylePropmts] || stylePropmts['Bold & Graphic']} for: "${title}"`;
 
     if (color_scheme) {
-        prompt += ` Use a ${colorSchemeDescriptions[color_scheme as keyof typeof colorSchemeDescriptions]} color scheme.`;
+      prompt += ` Use a ${colorSchemeDescriptions[color_scheme as keyof typeof colorSchemeDescriptions] || color_scheme} color scheme.`;
     }
 
     if (user_prompt) {
-        prompt += ` Additional details: ${user_prompt}.`;
+      prompt += ` Additional details: ${user_prompt}.`;
     }
 
-    prompt += ` The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore.`;
-
-    //Generate img using AI model
-    const response: any = await ai.models.generateContent({
-        model,
-        contents: [prompt],
-        config: generationConfig
-    });
-
-    //check if response is valid
-    if (!response?.candidates?.[0]?.content?.parts) {
-        throw new Error('Unexpected response');
+    if (text_overlay) {
+      prompt += ` Include clear readable text overlay: "${text_overlay}".`;
     }
 
-    const parts = response.candidates[0].content.parts;
+    prompt += ` YouTube thumbnail style, high quality, professional, click-worthy, no watermark.`;
 
-    let finalBuffer: Buffer | null = null;
+    const encodedPrompt = encodeURIComponent(prompt);
 
-    for (const part of parts) {
-        if (part.inlineData) {
-            finalBuffer = Buffer.from(part.inlineData.data, 'base64');
-        }
+    let width = 1280;
+    let height = 720;
+
+    if (aspect_ratio === '1:1') {
+      width = 1024;
+      height = 1024;
+    } else if (aspect_ratio === '9:16') {
+      width = 720;
+      height = 1280;
     }
 
-    if (!finalBuffer) {
-        throw new Error('No image data in response');
-    }
-
-    const imageUrl = await uploadImageBuffer(finalBuffer);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true`;
 
     thumbnail.image_url = imageUrl;
     thumbnail.isGenerating = false;
@@ -158,18 +95,17 @@ export const generateThumbnail = async (req: Request, res: Response) => {
   }
 };
 
-//controller for Thumbnail Deletion
 export const deleteThumbnail = async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { userId } = req.session;
+  try {
+    const { id } = req.params;
+    const { userId } = req.session;
 
-        await Thumbnail.findOneAndDelete({ _id: id, userId });
+    await Thumbnail.findOneAndDelete({ _id: id, userId });
 
-        res.json({ message: 'Thumbnail deleted successfully' });
+    res.json({ message: 'Thumbnail deleted successfully' });
 
-    } catch (error: any) {
-        console.log(error);
-        res.status(500).json({ message: error.message });
-    }
+  } catch (error: any) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
 };
