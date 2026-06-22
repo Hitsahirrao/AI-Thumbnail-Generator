@@ -1,10 +1,8 @@
 import { useRef, useState, type MouseEvent } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 
-// Hero image: drop a file at `src/assets/hero_img.png` and switch this back to
-// `import heroImage from "../assets/hero_img.png";` to use a local asset.
 const heroImage =
-  "https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?q=80&w=1600&auto=format&fit=crop";
+  "https://picsum.photos/seed/youtube-thumbnail-demo/1280/720";
 
 const springValues = {
   damping: 30,
@@ -12,13 +10,23 @@ const springValues = {
   mass: 2,
 };
 
-export default function TiltedImage({ rotateAmplitude = 3 }: { rotateAmplitude?: number }) {
+export default function TiltedImage({
+  rotateAmplitude = 3,
+}: {
+  rotateAmplitude?: number;
+}) {
   const ref = useRef<HTMLElement | null>(null);
+
   const x = useMotionValue(0);
   const y = useMotionValue(0);
+
   const rotateX = useSpring(useMotionValue(0), springValues);
   const rotateY = useSpring(useMotionValue(0), springValues);
-  const rotateFigcaption = useSpring(0, { stiffness: 350, damping: 30, mass: 1 });
+  const rotateFigcaption = useSpring(0, {
+    stiffness: 350,
+    damping: 30,
+    mass: 1,
+  });
 
   const [lastY, setLastY] = useState(0);
 
@@ -67,7 +75,7 @@ export default function TiltedImage({ rotateAmplitude = 3 }: { rotateAmplitude?:
         <img
           src={heroImage}
           className="border-b border-white/10 bg-gradient-to-b from-[#372AAC] to-transparent p-1 w-full rounded-[15px] will-change-transform [transform:translateZ(0)]"
-          alt="hero section showcase"
+          alt="AI thumbnail showcase"
         />
       </motion.div>
     </motion.figure>
